@@ -14,6 +14,14 @@ struct scan_info
 
     friend std::ostream& operator<< (std::ostream& out, const scan_info& scaninfo);
 
+    bool operator ==(const scan_info& other)
+    {
+        if (this->model == other.model)
+        {
+            return true;
+        }
+        return false;
+    }
 };
 
 ostream& operator<< (std::ostream& out, const scan_info& scaninfo)
@@ -26,7 +34,6 @@ class ScanFile
 {
 private:
     string path;
-    bool is_open;
     fstream fs;
 public:  
     static int RecordsCount; //количество записей
@@ -42,11 +49,7 @@ public:
         if (!fs.is_open())
         {
             cout << "Ошибка: не удалось открыть файл!" << endl;
-            this->is_open = false;
-        }
-        else
-        {
-            this->is_open = true;
+            exit(1);
         }
     }
     ~ScanFile()
@@ -55,22 +58,22 @@ public:
     }
     void writeStruct(scan_info record)
     {
-        if (this->is_open)
+        
+        
+        try
         {
-            try
-            {
-                fs.seekg(0, ios::beg);
-                RecordsCount++;
-                fs << RecordsCount << endl;
-                fs.seekg(0, ios::end);
-                fs << record;
-            }
-            catch (const std::exception& ex)
-            {
-                cout << "Что-то пошло не так, скорее всего произошла проблема при работе с файлом" << endl;
-                cout << "Error: " << ex.what() << endl;
-            }
+            fs.seekg(0, ios::beg);
+            RecordsCount++;
+            fs << RecordsCount << endl;
+            fs.seekg(0, ios::end);
+            fs << record;
         }
+        catch (const std::exception& ex)
+        {
+            cout << "Что-то пошло не так, скорее всего произошла проблема при работе с файлом" << endl;
+            cout << "Error: " << ex.what() << endl;
+        }
+        
         
     }
     scan_info createStruct()
@@ -78,27 +81,75 @@ public:
         scan_info si;
         cout << "Введите параметры сканера..." << endl;
         cin >> si.model >> si.price >> si.x_size >> si.y_size >> si.optr >> si.grey;
+        if (cin.fail())
+        {
+            si.model = "<undefined>";
+            si.price = si.x_size = si.y_size = si.optr = si.grey = 0;
+        }
         return si;
     }
     void check_count_records_in_file()
     {
-        fs.seekg(0, ios::beg);
-        try
+        if (fs.tellg() != 0)
         {
-            string temp;
-            getline(fs, temp);
-            if (temp != "")
+            fs.seekg(0, ios::beg);
+            try
             {
+                string temp;
+                getline(fs, temp);
                 RecordsCount += stoi(temp);
             }
+            catch (const std::exception& ex)
+            {
+                cout << "Что-то пошло не так, скорее всего файл имеет неправильную структуру, либо не открыт" << endl;
+                cout << "Error: " << ex.what() << endl;
+
+            }
         }
-        catch (const std::exception& ex)
+    }
+    bool foundstruct(scan_info addedscan)
+    {
+        string temp;
+        fs.seekg(0, ios::beg);
+        for (int i = 0; i < RecordsCount; i++)
         {
-            cout << "Что-то пошло не так, скорее всего файл имеет неправильную структуру, либо не открыт" << endl;
-            cout << "Error: " << ex.what() << endl;
-            
+            string temp1 = "";
+            getline(fs, temp);
+            for (int i = 0; i < temp.size(); i++)
+            {
+                if (temp[i] == ' ')
+                {
+                    break;
+                }
+                temp1 += temp[i];
+            }
+            if (temp1 == addedscan.model)
+            {
+                return true;
+            }
         }
-        
+        return false;
+    }
+    void try_add_struct()
+    {
+        scan_info temp = createStruct();
+        if (temp.model != "<undefined>")
+        {
+            if (foundstruct(temp))
+            {
+                cout << "Информация о данной модели сканера уже есть в файле" << endl;
+            }
+            else
+            {
+                writeStruct(temp);
+                cout << "Информация успешно записана" << endl;
+            }
+        }
+        else
+        {
+            cout << "При создании структура возникла ошибка: какое-то из полей введено некорректно" << endl;
+
+        }
     }
 };
 
@@ -109,14 +160,20 @@ int main()
     setlocale(LC_ALL, "ru");
     string path = "mainfile";
     ScanFile mainfile(path);
-    scan_info a = mainfile.createStruct();
-    scan_info b = mainfile.createStruct();
     mainfile.check_count_records_in_file();
-    mainfile.writeStruct(a);
-    mainfile.writeStruct(b);
+    cout << "Введите количество структур, которые вы хотите записать в файл..." << endl;
+    int n;
+    cin >> n;
+    if (!cin.fail())
+    {
+        for (size_t i = 0; i < n; i++)
+        {
+            mainfile.try_add_struct();
+        }
+    }
+    else
+    {
+        cout << "Некорретно введено количество структур (подсказка: используйте целые числа)" << endl;
+    }
     return 0;
-    /*Че надо сделать..?
-    * 1) Допилить функции так, чтобы RecordsCount правильно отображала число сделанных записей в файле
-    * 2) Реализовать функцию №2 из ТЗ
-    */
 }
